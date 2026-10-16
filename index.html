@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1216">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Stride">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Stride</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" crossorigin="anonymous">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" crossorigin="anonymous"></script>
+<style>
+:root{
+  --bg:#f4f5f2; --card:#ffffff; --ink:#14171a; --muted:#6b7177; --line:#e2e4e0;
+  --accent:#16a36a; --accent-ink:#ffffff; --route:#16a36a; --warn:#c2410c; --danger:#c62828;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0f1216; --card:#181c21; --ink:#eef1ec; --muted:#8b939b; --line:#262c33;
+    --accent:#3ddc97; --accent-ink:#06261a; --route:#3ddc97; --warn:#fb923c; --danger:#ef5350; }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--font)}
+body{display:flex;flex-direction:column;overscroll-behavior:none}
+header{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 10px) 16px 10px}
+header h1{font-size:20px;margin:0;letter-spacing:-.02em;font-weight:800}
+header h1 span{color:var(--accent)}
+.pill{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 14px;font:600 14px var(--font)}
+main{flex:1;overflow:auto;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+.view{display:none;padding:0 16px 16px}
+.view.active{display:block}
+.mapwrap{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line);height:36vh;min-height:220px;background:var(--card)}
+#map,#dmap{position:absolute;inset:0}
+.fab{position:absolute;right:10px;bottom:10px;z-index:500;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:20px}
+.gps{position:absolute;left:10px;top:10px;z-index:500;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font:600 12px var(--font);color:var(--muted)}
+.gps.good{color:var(--accent)} .gps.poor{color:var(--warn)}
+.banner{margin:12px 0 0;padding:10px 12px;border-radius:12px;background:var(--card);border:1px solid var(--warn);font-size:14px}
+.hidden{display:none!important}
+.live{margin-top:14px}
+.big{text-align:center}
+.lbl{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.big .val{font:800 76px/1 var(--font);letter-spacing:-.04em;font-variant-numeric:tabular-nums;margin-top:4px}
+.big .unit{color:var(--muted);font-weight:600}
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px;text-align:center}
+.row3 .val{font:700 26px/1.1 var(--font);font-variant-numeric:tabular-nums;margin-top:4px}
+.controls{display:flex;gap:10px;margin-top:20px}
+.btn{flex:1;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:16px;padding:16px;font:700 17px var(--font)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--danger)}
+.btn.huge{padding:22px;font-size:20px}
+.link{background:none;border:0;color:var(--muted);font:600 14px var(--font);text-decoration:underline;display:block;margin:12px auto 0}
+.hint{color:var(--muted);font-size:13px;text-align:center;margin:14px 8px 0;line-height:1.4}
+.hint.warn{color:var(--warn)}
+h3{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:22px 0 10px}
+.list{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:var(--ink);font-family:var(--font)}
+.card canvas{width:56px;height:56px;flex:none}
+.card .t{font-weight:700;font-size:16px}
+.card .s{color:var(--muted);font-size:14px;margin-top:2px;font-variant-numeric:tabular-nums}
+.empty{color:var(--muted);text-align:center;padding:40px 10px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
+.tile .v{font:800 26px/1.1 var(--font);font-variant-numeric:tabular-nums;margin-top:6px}
+.tile .x{color:var(--muted);font-size:13px;margin-top:2px}
+.chartbox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}
+#weekChart{width:100%;height:180px;display:block}
+.setrow{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:8px;font-size:15px}
+.setrow small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:transparent;color:var(--ink);padding:7px 14px;font:600 14px var(--font)}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.switch{position:relative;width:50px;height:30px;flex:none}
+.switch input{opacity:0;width:0;height:0}
+.switch span{position:absolute;inset:0;background:var(--line);border-radius:999px;transition:.2s}
+.switch span:before{content:"";position:absolute;width:24px;height:24px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.switch input:checked+span{background:var(--accent)}
+.switch input:checked+span:before{transform:translateX(20px)}
+.small{padding:8px 14px;font-size:14px;border-radius:10px;flex:none}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:1000}
+nav button{flex:1;border:0;background:none;color:var(--muted);padding:12px 0 14px;font:600 13px var(--font);display:flex;flex-direction:column;align-items:center;gap:3px}
+nav button svg{width:24px;height:24px}
+nav button.on{color:var(--accent)}
+.sheet{position:fixed;inset:0;background:var(--bg);z-index:2000;overflow:auto;padding:calc(env(safe-area-inset-top) + 8px) 16px calc(24px + env(safe-area-inset-bottom))}
+.sheethead{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.sheethead button{border:0;background:none;color:var(--accent);font:600 17px var(--font);padding:8px 4px}
+.sheethead div{font-weight:700;font-size:16px}
+.dstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px;text-align:center}
+.dstats .val{font:700 22px/1.1 var(--font);font-variant-numeric:tabular-nums;margin-top:4px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:15px}
+td,th{padding:9px 6px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+td.bar{width:45%}
+td.bar i{display:block;height:8px;border-radius:4px;background:var(--accent);opacity:.8}
+.dbtns{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.dbtns .btn{flex:1 1 45%}
+.leaflet-container{background:var(--card)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Stride<span>.</span></h1>
+  <button class="pill" id="unitBtn">mi</button>
+</header>
+
+<main>
+  <!-- RUN -->
+  <section id="v-run" class="view active">
+    <div class="mapwrap">
+      <div id="map"></div>
+      <div id="gps" class="gps">GPS off</div>
+      <button id="recenter" class="fab" aria-label="Recenter map">◎</button>
+    </div>
+    <div id="banner" class="banner hidden"></div>
+    <div class="live">
+      <div class="big">
+        <div class="lbl">Distance</div>
+        <div class="val" id="lDist">0.00</div>
+        <div class="unit" id="lDistU">miles</div>
+      </div>
+      <div class="row3">
+        <div><div class="lbl">Time</div><div class="val" id="lTime">0:00</div></div>
+        <div><div class="lbl">Avg pace</div><div class="val" id="lAvg">–:––</div></div>
+        <div><div class="lbl">Current</div><div class="val" id="lCur">–:––</div></div>
+      </div>
+    </div>
+    <div class="controls" id="controls"></div>
+    <button class="link hidden" id="discardBtn">Discard this run</button>
+    <p class="hint" id="wakeHint">Keep Stride open during your run — the screen stays on so GPS keeps tracking.</p>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="v-history" class="view">
+    <h3>Your runs</h3>
+    <div class="list" id="runList"></div>
+  </section>
+
+  <!-- STATS -->
+  <section id="v-stats" class="view">
+    <h3>Progress</h3>
+    <div class="tiles" id="tiles"></div>
+    <h3>Weekly distance · last 12 weeks</h3>
+    <div class="chartbox"><canvas id="weekChart"></canvas></div>
+
+    <h3>Settings</h3>
+    <div class="setrow"><div>Units</div>
+      <div class="seg" id="unitSeg"><button data-u="mi">Miles</button><button data-u="km">Km</button></div></div>
+    <div class="setrow"><div>Hide start &amp; end on shared images<small>Trims ~200 m from each end so your home isn't on the map</small></div>
+      <label class="switch"><input type="checkbox" id="trimToggle"><span></span></label></div>
+    <div class="setrow"><div>Back up runs<small>Your runs live only on this phone. Save a backup now and then.</small></div>
+      <button class="btn small" id="exportBtn">Export</button></div>
+    <div class="setrow"><div>Restore backup<small>Merges a backup file into this phone</small></div>
+      <button class="btn small" id="importBtn">Import</button></div>
+    <input type="file" id="importFile" accept=".json,application/json" class="hidden">
+    <p class="hint">No accounts, no servers, no tracking. Map tiles come from OpenStreetMap; everything else stays on your device.</p>
+  </section>
+</main>
+
+<nav>
+  <button data-v="run" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polygon points="10,8 16,12 10,16" fill="currentColor"/></svg>Record</button>
+  <button data-v="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Runs</button>
+  <button data-v="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V12M12 20V5M19 20v-9"/></svg>Progress</button>
+</nav>
+
+<!-- RUN DETAIL -->
+<div id="detail" class="sheet hidden">
+  <div class="sheethead"><button id="dBack">‹ Back</button><div id="dTitle"></div></div>
+  <div class="mapwrap"><div id="dmap"></div></div>
+  <div class="dstats" id="dStats"></div>
+  <h3>Splits</h3>
+  <table id="dSplits"></table>
+  <div class="dbtns">
+    <button class="btn primary" id="dShare">Share image</button>
+    <button class="btn" id="dGpx">Export GPX</button>
+    <button class="btn danger" id="dDel">Delete run</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ---------- tiny helpers ---------- */
+const $ = s => document.querySelector(s);
+const M_PER = { mi: 1609.344, km: 1000 };
+const UNIT_LONG = { mi: 'miles', km: 'kilometers' };
+const ls = {
+  get(k){ try { return localStorage.getItem('stride.' + k); } catch(e){ return null; } },
+  set(k,v){ try { localStorage.setItem('stride.' + k, v); } catch(e){} },
+  del(k){ try { localStorage.removeItem('stride.' + k); } catch(e){} }
+};
+const S = {
+  units: ls.get('units') || 'mi',
+  trim: ls.get('trim') !== '0',
+  run: null, mode: 'idle',            // idle | acquiring | running | paused
+  watchId: null, tick: null, wake: null, lastFix: null,
+  map: null, line: null, dot: null, follow: true,
+  dmap: null, detailRun: null, lastPersist: 0
+};
+const GOOD_ACC = 30;   // metres – fixes worse than this are ignored while recording
+
+function hav(a, b){
+  const R = 6371008.8, r = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+  const s = Math.sin(dLat/2)**2 + Math.cos(a.lat*r) * Math.cos(b.lat*r) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+}
+const pad = n => String(n).padStart(2, '0');
+function fmtTime(ms){
+  const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  return h ? `${h}:${pad(m)}:${pad(x)}` : `${m}:${pad(x)}`;
+}
+function fmtPace(mps){
+  if (!mps || mps < 0.4) return '–:––';
+  const sec = Math.round(M_PER[S.units] / mps);
+  if (sec >= 3600) return '–:––';
+  return `${Math.floor(sec / 60)}:${pad(sec % 60)}`;
+}
+const fmtDist = m => (m / M_PER[S.units]).toFixed(2);
+const fmtDate = t => new Date(t).toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+const fmtTOD = t => new Date(t).toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
+function runName(t){
+  const h = new Date(t).getHours();
+  return (h < 5 ? 'Night' : h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : h < 21 ? 'Evening' : 'Night') + ' Run';
+}
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* ---------- storage (IndexedDB) ---------- */
+const DB = {
+  db: null,
+  open(){
+    if (this.db) return Promise.resolve(this.db);
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('stride', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('runs', { keyPath: 'id' });
+      r.onsuccess = () => { this.db = r.result; res(this.db); };
+      r.onerror = () => rej(r.error);
+    });
+  },
+  async tx(mode, fn){
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const t = db.transaction('runs', mode), req = fn(t.objectStore('runs'));
+      t.oncomplete = () => res(req ? req.result : undefined);
+      t.onerror = () => rej(t.error);
+    });
+  },
+  put(run){ return this.tx('readwrite', s => s.put(run)); },
+  del(id){ return this.tx('readwrite', s => s.delete(id)); },
+  async all(){ const a = await this.tx('readonly', s => s.getAll()); return (a || []).sort((x, y) => y.start - x.start); }
+};
+
+/* ---------- run math ---------- */
+function activeMs(r){ return r.activeMs + (S.mode === 'running' ? Date.now() - r.resumedAt : 0); }
+function currentSpeed(r){
+  const p = r.points; if (p.length < 2) return 0;
+  const last = p[p.length - 1];
+  if (Date.now() - last.t > 15000) return 0;
+  let d = 0, first = null;
+  for (let i = p.length - 1; i > 0; i--){
+    const a = p[i-1], b = p[i];
+    if (a.seg !== b.seg || last.t - a.t > 30000) break;
+    d += hav(a, b); first = a;
+  }
+  if (!first) return 0;
+  const dt = (last.t - first.t) / 1000;
+  return dt > 4 ? d / dt : 0;
+}
+function elevGain(points){
+  let gain = 0, ref = null;
+  for (const p of points){
+    if (p.alt == null) continue;
+    if (ref == null){ ref = p.alt; continue; }
+    if (p.alt - ref > 3){ gain += p.alt - ref; ref = p.alt; }
+    else if (ref - p.alt > 3) ref = p.alt;
+  }
+  return gain;
+}
+function splits(run){
+  const unit = M_PER[S.units], pts = run.points, out = [];
+  let cum = 0, next = unit, lastMt = 0;
+  for (let i = 1; i < pts.length; i++){
+    const a = pts[i-1], b = pts[i];
+    if (a.seg !== b.seg) continue;
+    const d = hav(a, b);
+    while (d > 0 && cum + d >= next){
+      const f = (next - cum) / d, mt = a.mt + (b.mt - a.mt) * f;
+      out.push({ ms: mt - lastMt, dist: unit });
+      lastMt = mt; next += unit;
+    }
+    cum += d;
+  }
+  const rem = cum - (next - unit);
+  if (rem > unit * 0.05) out.push({ ms: run.duration - lastMt, dist: rem, partial: true });
+  return out;
+}
+function segLatLngs(points){
+  const segs = []; let cur = null, id = null;
+  for (const p of points){
+    if (p.seg !== id){ cur = []; segs.push(cur); id = p.seg; }
+    cur.push([p.lat, p.lon]);
+  }
+  return segs;
+}
+
+/* ---------- GPS ---------- */
+function startGPS(){
+  if (S.watchId != null) return;
+  if (!('geolocation' in navigator)){ showBanner('This browser has no GPS access.'); return; }
+  S.watchId = navigator.geolocation.watchPosition(onFix, onGpsError,
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+}
+function stopGPS(){
+  if (S.watchId != null) navigator.geolocation.clearWatch(S.watchId);
+  S.watchId = null; S.lastFix = null; renderGps();
+}
+function onGpsError(e){
+  if (e.code === 1){
+    showBanner('Location permission is off. Allow location for this site in your browser settings, then reload.');
+    stopGPS(); setMode(S.run ? 'paused' : 'idle');
+  } else renderGps('No GPS signal');
+}
+function onFix(pos){
+  const c = pos.coords;
+  const p = { t: Date.now(), lat: +c.latitude.toFixed(6), lon: +c.longitude.toFixed(6),
+              alt: c.altitude == null ? null : Math.round(c.altitude * 10) / 10, acc: Math.round(c.accuracy) };
+  S.lastFix = p; renderGps(); moveDot(p);
+  if (S.mode === 'acquiring' && p.acc <= GOOD_ACC){ beginRecording(); }
+  if (S.mode !== 'running' || p.acc > GOOD_ACC) return;
+  const r = S.run, last = r.points[r.points.length - 1];
+  p.mt = activeMs(r); p.seg = r.seg;
+  if (last && last.seg === r.seg){
+    const d = hav(last, p), dt = (p.t - last.t) / 1000;
+    if (d < Math.max(2, p.acc * 0.25)) return;     // standing-still jitter
+    if (dt > 0 && d / dt > 12) return;             // impossible jump (> 12 m/s)
+    r.dist += d;
+  }
+  r.points.push(p);
+  drawLive(); persist();
+}
+
+/* ---------- screen wake lock ---------- */
+async function wakeOn(){
+  if (!('wakeLock' in navigator)){ renderWake(); return; }
+  try {
+    S.wake = await navigator.wakeLock.request('screen');
+    S.wake.addEventListener('release', () => { S.wake = null; renderWake(); });
+  } catch(e){ S.wake = null; }
+  renderWake();
+}
+function wakeOff(){ try { S.wake && S.wake.release(); } catch(e){} S.wake = null; renderWake(); }
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible'){
+    if ((S.mode === 'running' || S.mode === 'acquiring') && !S.wake) wakeOn();
+  } else if (S.run) persist(true);
+});
+function renderWake(){
+  const h = $('#wakeHint');
+  if (S.mode === 'idle'){ h.className = 'hint'; h.textContent = 'Keep Stride open during your run — the screen stays on so GPS keeps tracking.'; return; }
+  if (!('wakeLock' in navigator)){
+    h.className = 'hint warn';
+    h.textContent = "This browser can't keep the screen on. Set Auto-Lock to Never for your run, and keep Stride in front.";
+  } else if (S.wake){
+    h.className = 'hint'; h.textContent = 'Screen will stay on. Leaving the app pauses GPS — keep Stride in front.';
+  } else {
+    h.className = 'hint warn'; h.textContent = 'Screen lock is active — tap anywhere to keep the screen on.';
+  }
+}
+document.addEventListener('click', () => { if ((S.mode === 'running') && !S.wake) wakeOn(); });
+
+/* ---------- recording flow ---------- */
+function startPressed(){
+  hideBanner();
+  S.mode = 'acquiring'; startGPS(); wakeOn(); renderControls();
+  if (S.lastFix && Date.now() - S.lastFix.t < 10000 && S.lastFix.acc <= GOOD_ACC) beginRecording();
+}
+function beginRecording(){
+  const now = Date.now();
+  S.run = { id: 'r' + now, start: now, points: [], seg: 0, activeMs: 0, resumedAt: now, dist: 0 };
+  S.follow = true;
+  setMode('running');
+  if (S.lastFix && S.lastFix.acc <= GOOD_ACC) onFix({ coords: { latitude: S.lastFix.lat, longitude: S.lastFix.lon, altitude: S.lastFix.alt, accuracy: S.lastFix.acc } });
+}
+function pause(){
+  const r = S.run; r.activeMs += Date.now() - r.resumedAt;
+  setMode('paused'); persist(true);
+}
+function resume(){
+  const r = S.run; r.seg += 1; r.resumedAt = Date.now();
+  startGPS(); wakeOn(); setMode('running');
+}
+async function finish(){
+  const r = S.run;
+  if (S.mode === 'running') pause();
+  if (r.dist < 50 && !confirm('This run is very short. Save it anyway?')) return;
+  const run = {
+    id: r.id, start: r.start, end: r.points.length ? r.points[r.points.length - 1].t : Date.now(),
+    duration: r.activeMs, distance: Math.round(r.dist), gain: Math.round(elevGain(r.points)),
+    points: r.points.map(({ t, lat, lon, alt, mt, seg }) => ({ t, lat, lon, alt, mt: Math.round(mt), seg }))
+  };
+  await DB.put(run);
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch(e){}
+  endSession();
+  await renderLists();
+  openDetail(run);
+}
+function discard(){
+  if (!confirm('Discard this run? It will not be saved.')) return;
+  endSession();
+}
+function endSession(){
+  S.run = null; ls.del('inprogress');
+  stopGPS(); wakeOff(); setMode('idle');
+  if (S.line) S.line.setLatLngs([]);
+  renderLive();
+}
+function setMode(m){
+  S.mode = m;
+  clearInterval(S.tick);
+  if (m === 'running') S.tick = setInterval(renderLive, 1000);
+  if (m !== 'running' && m !== 'acquiring') wakeOff();
+  renderControls(); renderLive(); renderWake();
+}
+function persist(force){
+  if (!S.run) return;
+  const now = Date.now();
+  if (!force && now - S.lastPersist < 5000) return;
+  S.lastPersist = now;
+  ls.set('inprogress', JSON.stringify({ ...S.run, activeMs: activeMs(S.run) }));
+}
+function restoreInProgress(){
+  const raw = ls.get('inprogress'); if (!raw) return;
+  try {
+    const r = JSON.parse(raw);
+    if (!r || !Array.isArray(r.points)) return;
+    S.run = r; S.mode = 'paused';
+    showBanner(`Recovered an unfinished run (${fmtDist(r.dist)} ${S.units}). Tap Resume to keep going or Finish to save it.`);
+    drawLive(true);
+  } catch(e){ ls.del('inprogress'); }
+}
+
+/* ---------- live UI ---------- */
+function renderControls(){
+  const c = $('#controls');
+  const b = (id, label, cls='') => `<button class="btn ${cls}" id="${id}">${label}</button>`;
+  if (S.mode === 'idle') c.innerHTML = b('cStart', 'Start run', 'primary huge');
+  else if (S.mode === 'acquiring') c.innerHTML = b('cNow', 'Finding GPS… tap to start now', 'huge') ;
+  else if (S.mode === 'running') c.innerHTML = b('cPause', 'Pause', 'huge') + b('cFinish', 'Finish', 'primary huge');
+  else c.innerHTML = b('cResume', 'Resume', 'primary huge') + b('cFinish', 'Finish', 'huge');
+  $('#discardBtn').classList.toggle('hidden', S.mode !== 'paused');
+  const on = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
+  on('cStart', startPressed); on('cNow', beginRecording); on('cPause', pause);
+  on('cResume', () => { hideBanner(); resume(); }); on('cFinish', finish);
+}
+function renderLive(){
+  const r = S.run;
+  $('#lDistU').textContent = UNIT_LONG[S.units];
+  if (!r){ $('#lDist').textContent = '0.00'; $('#lTime').textContent = '0:00'; $('#lAvg').textContent = $('#lCur').textContent = '–:––'; return; }
+  const ms = activeMs(r);
+  $('#lDist').textContent = fmtDist(r.dist);
+  $('#lTime').textContent = fmtTime(ms);
+  $('#lAvg').textContent = fmtPace(ms > 0 ? r.dist / (ms / 1000) : 0);
+  $('#lCur').textContent = S.mode === 'running' ? fmtPace(currentSpeed(r)) : '–:––';
+}
+function renderGps(text){
+  const g = $('#gps'), f = S.lastFix;
+  if (text){ g.textContent = text; g.className = 'gps poor'; return; }
+  if (S.watchId == null || !f){ g.textContent = S.watchId == null ? 'GPS off' : 'Finding GPS…'; g.className = 'gps'; return; }
+  g.textContent = `GPS ±${f.acc} m`;
+  g.className = 'gps ' + (f.acc <= GOOD_ACC ? 'good' : 'poor');
+}
+function showBanner(t){ const b = $('#banner'); b.textContent = t; b.classList.remove('hidden'); }
+function hideBanner(){ $('#banner').classList.add('hidden'); }
+
+function tileLayer(){
+  return L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' });
+}
+function initMap(){
+  if (!window.L){ $('#map').innerHTML = '<div class="empty">Map unavailable offline — tracking still works.</div>'; return; }
+  S.map = L.map('map', { zoomControl: false, attributionControl: true }).setView([39.5, -98.35], 3);
+  tileLayer().addTo(S.map);
+  S.line = L.polyline([], { color: cssVar('--route'), weight: 5, opacity: .95 }).addTo(S.map);
+  S.map.on('dragstart', () => { S.follow = false; });
+}
+function moveDot(p){
+  if (!S.map) return;
+  const ll = [p.lat, p.lon];
+  if (!S.dot){
+    S.dot = L.circleMarker(ll, { radius: 8, color: '#fff', weight: 3, fillColor: cssVar('--accent'), fillOpacity: 1 }).addTo(S.map);
+    S.map.setView(ll, 16);
+  } else S.dot.setLatLng(ll);
+  if (S.follow) S.map.panTo(ll, { animate: true });
+}
+function drawLive(fit){
+  if (!S.map || !S.run) return;
+  const segs = segLatLngs(S.run.points);
+  S.line.setLatLngs(segs);
+  if (fit && S.run.points.length > 1) S.map.fitBounds(S.line.getBounds(), { padding: [20, 20] });
+}
+$('#recenter').onclick = () => {
+  S.follow = true;
+  if (S.lastFix && S.map) S.map.setView([S.lastFix.lat, S.lastFix.lon], Math.max(S.map.getZoom(), 15));
+  else if (S.mode === 'idle'){ startGPS(); renderGps(); }
+};
+$('#discardBtn').onclick = discard;
+
+/* ---------- history & stats ---------- */
+function thumb(canvas, run){
+  const dpr = window.devicePixelRatio || 1, W = 56, H = 56;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const g = canvas.getContext('2d'); g.scale(dpr, dpr);
+  g.fillStyle = cssVar('--bg'); roundRect(g, 0, 0, W, H, 12); g.fill();
+  drawRoute(g, run.points, 6, 6, W - 12, H - 12, cssVar('--route'), 2.2);
+}
+function roundRect(g, x, y, w, h, r){ g.beginPath(); g.moveTo(x+r, y); g.arcTo(x+w, y, x+w, y+h, r); g.arcTo(x+w, y+h, x, y+h, r); g.arcTo(x, y+h, x, y, r); g.arcTo(x, y, x+w, y, r); g.closePath(); }
+function drawRoute(g, points, x, y, w, h, color, width){
+  if (points.length < 2) return;
+  const lat0 = points[0].lat * Math.PI / 180, k = Math.cos(lat0);
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  const xy = points.map(p => { const px = p.lon * k, py = -p.lat;
+    minX = Math.min(minX, px); maxX = Math.max(maxX, px); minY = Math.min(minY, py); maxY = Math.max(maxY, py); return [px, py, p.seg]; });
+  const sx = maxX - minX || 1e-9, sy = maxY - minY || 1e-9, sc = Math.min(w / sx, h / sy);
+  const ox = x + (w - sx * sc) / 2, oy = y + (h - sy * sc) / 2;
+  g.strokeStyle = color; g.lineWidth = width; g.lineJoin = 'round'; g.lineCap = 'round';
+  g.beginPath(); let seg = null;
+  for (const [px, py, s] of xy){
+    const X = ox + (px - minX) * sc, Y = oy + (py - minY) * sc;
+    if (s !== seg){ g.moveTo(X, Y); seg = s; } else g.lineTo(X, Y);
+  }
+  g.stroke();
+}
+async function renderLists(){
+  const runs = await DB.all();
+  const list = $('#runList');
+  if (!runs.length){ list.innerHTML = '<div class="empty">No runs yet. Your first one will show up here.</div>'; }
+  else {
+    list.innerHTML = '';
+    for (const run of runs){
+      const btn = document.createElement('button'); btn.className = 'card';
+      const cv = document.createElement('canvas'); thumb(cv, run);
+      const pace = fmtPace(run.duration ? run.distance / (run.duration / 1000) : 0);
+      btn.append(cv);
+      btn.insertAdjacentHTML('beforeend', `<div><div class="t">${fmtDist(run.distance)} ${S.units} · ${runName(run.start)}</div>
+        <div class="s">${fmtDate(run.start)} · ${fmtTime(run.duration)} · ${pace} /${S.units}</div></div>`);
+      btn.onclick = () => openDetail(run);
+      list.append(btn);
+    }
+  }
+  renderStats(runs);
+}
+function weekStart(t){ const d = new Date(t); d.setHours(0,0,0,0); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d.getTime(); }
+function renderStats(runs){
+  const now = new Date(), u = S.units, U = M_PER[u];
+  const wk = weekStart(now), mo = new Date(now.getFullYear(), now.getMonth(), 1).getTime(), yr = new Date(now.getFullYear(), 0, 1).getTime();
+  const sum = since => { const rs = runs.filter(r => r.start >= since); return [rs.reduce((a, r) => a + r.distance, 0), rs.length]; };
+  const [wD, wN] = sum(wk), [mD, mN] = sum(mo), [yD, yN] = sum(yr), [aD, aN] = sum(0);
+  const longest = runs.reduce((a, r) => r.distance > (a ? a.distance : 0) ? r : a, null);
+  const fast = runs.filter(r => r.distance >= U && r.duration > 0)
+                   .reduce((a, r) => (r.distance / r.duration) > (a ? a.distance / a.duration : 0) ? r : a, null);
+  const tile = (l, v, x) => `<div class="tile"><div class="lbl">${l}</div><div class="v">${v}</div><div class="x">${x}</div></div>`;
+  const runsTxt = n => `${n} run${n === 1 ? '' : 's'}`;
+  $('#tiles').innerHTML =
+    tile('This week', `${fmtDist(wD)} ${u}`, runsTxt(wN)) +
+    tile('This month', `${fmtDist(mD)} ${u}`, runsTxt(mN)) +
+    tile('This year', `${fmtDist(yD)} ${u}`, runsTxt(yN)) +
+    tile('All time', `${fmtDist(aD)} ${u}`, runsTxt(aN)) +
+    tile('Longest run', longest ? `${fmtDist(longest.distance)} ${u}` : '—', longest ? fmtDate(longest.start) : 'No runs yet') +
+    tile('Best avg pace', fast ? `${fmtPace(fast.distance / (fast.duration / 1000))}` : '—', fast ? `/${u} · ${fmtDate(fast.start)}` : `Runs of 1 ${u}+`);
+  drawWeekChart(runs);
+}
+function drawWeekChart(runs){
+  const cv = $('#weekChart'), dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth || 320, H = 180;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const weeks = []; const cur = weekStart(Date.now());
+  for (let i = 11; i >= 0; i--){ const d = new Date(cur); d.setDate(d.getDate() - 7 * i); weeks.push({ t: d.getTime(), v: 0 }); }
+  for (const r of runs){ const w = weeks.find(x => x.t === weekStart(r.start)); if (w) w.v += r.distance / M_PER[S.units]; }
+  const max = Math.max(1, ...weeks.map(w => w.v));
+  const top = 22, bottom = H - 22, bw = W / weeks.length;
+  g.font = `600 11px ${cssVar('--font')}`; g.textAlign = 'center';
+  g.strokeStyle = cssVar('--line'); g.lineWidth = 1; g.beginPath(); g.moveTo(0, bottom + .5); g.lineTo(W, bottom + .5); g.stroke();
+  weeks.forEach((w, i) => {
+    const h = (bottom - top) * (w.v / max), x = i * bw + bw * 0.18, bwid = bw * 0.64;
+    g.fillStyle = i === weeks.length - 1 ? cssVar('--accent') : cssVar('--muted');
+    g.globalAlpha = i === weeks.length - 1 ? 1 : 0.45;
+    if (h > 0){ roundRect(g, x, bottom - h, bwid, h, Math.min(4, h / 2)); g.fill(); }
+    g.globalAlpha = 1;
+    if (i === weeks.length - 1 || w.v === max && w.v > 0){ g.fillStyle = cssVar('--ink'); g.fillText(w.v.toFixed(1), x + bwid / 2, bottom - h - 6); }
+    if (i % 3 === 2 || i === weeks.length - 1){
+      const d = new Date(w.t); g.fillStyle = cssVar('--muted');
+      g.fillText(i === weeks.length - 1 ? 'Now' : `${d.getMonth() + 1}/${d.getDate()}`, x + bwid / 2, H - 6);
+    }
+  });
+}
+
+/* ---------- run detail ---------- */
+function openDetail(run){
+  S.detailRun = run;
+  $('#detail').classList.remove('hidden');
+  $('#dTitle').textContent = `${runName(run.start)} · ${fmtDate(run.start)}, ${fmtTOD(run.start)}`;
+  const avg = run.duration ? run.distance / (run.duration / 1000) : 0;
+  const stat = (l, v) => `<div><div class="lbl">${l}</div><div class="val">${v}</div></div>`;
+  const gain = run.gain ? (S.units === 'mi' ? `${Math.round(run.gain * 3.28084)} ft` : `${run.gain} m`) : '—';
+  $('#dStats').innerHTML = stat('Distance', `${fmtDist(run.distance)} ${S.units}`) + stat('Time', fmtTime(run.duration)) +
+    stat('Avg pace', `${fmtPace(avg)}`) + stat('Elev gain', gain) + stat('Started', fmtTOD(run.start)) +
+    stat('Points', run.points.length);
+  const sp = splits(run), maxMs = Math.max(1, ...sp.map(s => s.ms * (M_PER[S.units] / s.dist)));
+  $('#dSplits').innerHTML = sp.length ? `<tr><th>${S.units}</th><th>Pace</th><th></th></tr>` + sp.map((s, i) => {
+    const pace = s.ms > 0 ? fmtPace(s.dist / (s.ms / 1000)) : '–:––';
+    const norm = s.ms * (M_PER[S.units] / s.dist);
+    return `<tr><td>${s.partial ? (s.dist / M_PER[S.units]).toFixed(2) : i + 1}</td><td>${pace}</td><td class="bar"><i style="width:${Math.round(40 + 60 * (1 - norm / maxMs) + 0)}%"></i></td></tr>`;
+  }).join('') : `<tr><td class="empty">Run at least 1 ${S.units} to see splits.</td></tr>`;
+  if (window.L){
+    if (S.dmap){ S.dmap.remove(); S.dmap = null; }
+    S.dmap = L.map('dmap', { zoomControl: false });
+    tileLayer().addTo(S.dmap);
+    const segs = segLatLngs(run.points);
+    if (run.points.length){
+      const line = L.polyline(segs, { color: cssVar('--route'), weight: 5 }).addTo(S.dmap);
+      const a = run.points[0], z = run.points[run.points.length - 1];
+      L.circleMarker([a.lat, a.lon], { radius: 6, color: '#fff', weight: 2, fillColor: '#22c55e', fillOpacity: 1 }).addTo(S.dmap);
+      L.circleMarker([z.lat, z.lon], { radius: 6, color: '#fff', weight: 2, fillColor: '#ef4444', fillOpacity: 1 }).addTo(S.dmap);
+      setTimeout(() => { S.dmap.invalidateSize(); S.dmap.fitBounds(line.getBounds(), { padding: [24, 24] }); }, 60);
+    } else S.dmap.setView([39.5, -98.35], 3);
+  }
+}
+$('#dBack').onclick = () => { $('#detail').classList.add('hidden'); if (S.dmap){ S.dmap.remove(); S.dmap = null; } };
+$('#dDel').onclick = async () => {
+  if (!confirm('Delete this run permanently?')) return;
+  await DB.del(S.detailRun.id); $('#dBack').onclick(); renderLists();
+};
+$('#dGpx').onclick = () => {
+  const r = S.detailRun;
+  shareFile(new Blob([toGPX(r)], { type: 'application/gpx+xml' }), `stride-${new Date(r.start).toISOString().slice(0,10)}.gpx`, 'Stride run');
+};
+$('#dShare').onclick = () => shareImage(S.detailRun);
+
+function toGPX(run){
+  let body = '', seg = null;
+  for (const p of run.points){
+    if (p.seg !== seg){ if (seg !== null) body += '</trkseg>'; body += '<trkseg>'; seg = p.seg; }
+    body += `<trkpt lat="${p.lat}" lon="${p.lon}">${p.alt != null ? `<ele>${p.alt}</ele>` : ''}<time>${new Date(p.t).toISOString()}</time></trkpt>`;
+  }
+  if (seg !== null) body += '</trkseg>';
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Stride" xmlns="http://www.topografix.com/GPX/1/1">` +
+    `<metadata><time>${new Date(run.start).toISOString()}</time></metadata><trk><name>${runName(run.start)}</name><type>running</type>${body}</trk></gpx>`;
+}
+function trimEnds(points, metres){
+  let total = 0; for (let i = 1; i < points.length; i++) if (points[i].seg === points[i-1].seg) total += hav(points[i-1], points[i]);
+  const cut = Math.min(metres, total * 0.15);
+  let a = 0, d = 0; while (a < points.length - 1 && d < cut){ d += hav(points[a], points[a+1]); a++; }
+  let b = points.length - 1; d = 0; while (b > a && d < cut){ d += hav(points[b-1], points[b]); b--; }
+  return points.slice(a, b + 1);
+}
+async function shareImage(run){
+  const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, H); grad.addColorStop(0, '#0f1216'); grad.addColorStop(1, '#14231d');
+  g.fillStyle = grad; g.fillRect(0, 0, W, H);
+  const pts = S.trim ? trimEnds(run.points, 200) : run.points;
+  g.shadowColor = 'rgba(61,220,151,.55)'; g.shadowBlur = 24;
+  drawRoute(g, pts, 110, 150, W - 220, 700, '#3ddc97', 12);
+  g.shadowBlur = 0;
+  const font = cssVar('--font');
+  g.fillStyle = '#8b939b'; g.font = `600 34px ${font}`; g.textAlign = 'left';
+  g.fillText(`${runName(run.start)} · ${fmtDate(run.start)}`.toUpperCase(), 80, 96);
+  const avg = run.duration ? run.distance / (run.duration / 1000) : 0;
+  const cols = [['Distance', `${fmtDist(run.distance)}`, S.units], ['Pace', fmtPace(avg), `/${S.units}`], ['Time', fmtTime(run.duration), '']];
+  cols.forEach(([l, v, u], i) => {
+    const x = 80 + i * 320;
+    g.fillStyle = '#8b939b'; g.font = `600 30px ${font}`; g.fillText(l.toUpperCase(), x, 1010);
+    g.fillStyle = '#eef1ec'; g.font = `800 92px ${font}`; g.fillText(v, x, 1110);
+    if (u){ g.fillStyle = '#8b939b'; g.font = `600 34px ${font}`; g.fillText(u, x, 1160); }
+  });
+  g.fillStyle = '#3ddc97'; g.font = `800 40px ${font}`; g.fillText('Stride.', 80, H - 70);
+  const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+  shareFile(blob, `stride-${new Date(run.start).toISOString().slice(0,10)}.png`, 'My run');
+}
+async function shareFile(blob, name, title){
+  const file = new File([blob], name, { type: blob.type });
+  if (navigator.canShare && navigator.canShare({ files: [file] })){
+    try { await navigator.share({ files: [file], title }); return; }
+    catch(e){ if (e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+/* ---------- backup ---------- */
+$('#exportBtn').onclick = async () => {
+  const runs = await DB.all();
+  const blob = new Blob([JSON.stringify({ app: 'stride', version: 1, exported: new Date().toISOString(), runs })], { type: 'application/json' });
+  shareFile(blob, `stride-backup-${new Date().toISOString().slice(0,10)}.json`, 'Stride backup');
+};
+$('#importBtn').onclick = () => $('#importFile').click();
+$('#importFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    const runs = (data.runs || []).filter(r => r && r.id && Array.isArray(r.points));
+    for (const r of runs) await DB.put(r);
+    alert(`Imported ${runs.length} run${runs.length === 1 ? '' : 's'}.`);
+    renderLists();
+  } catch(err){ alert("That file isn't a Stride backup."); }
+  e.target.value = '';
+};
+
+/* ---------- settings & nav ---------- */
+function setUnits(u){
+  S.units = u; ls.set('units', u);
+  $('#unitBtn').textContent = u;
+  document.querySelectorAll('#unitSeg button').forEach(b => b.classList.toggle('on', b.dataset.u === u));
+  renderLive(); renderLists();
+  if (S.detailRun && !$('#detail').classList.contains('hidden')) openDetail(S.detailRun);
+}
+$('#unitBtn').onclick = () => setUnits(S.units === 'mi' ? 'km' : 'mi');
+document.querySelectorAll('#unitSeg button').forEach(b => b.onclick = () => setUnits(b.dataset.u));
+$('#trimToggle').checked = S.trim;
+$('#trimToggle').onchange = e => { S.trim = e.target.checked; ls.set('trim', S.trim ? '1' : '0'); };
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'v-' + b.dataset.v));
+  if (b.dataset.v === 'run' && S.map) setTimeout(() => S.map.invalidateSize(), 50);
+  if (b.dataset.v === 'stats') renderLists();
+});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (S.line) S.line.setStyle({ color: cssVar('--route') }); renderLists(); });
+
+/* ---------- boot ---------- */
+initMap();
+setUnits(S.units);
+restoreInProgress();
+renderControls(); renderLive(); renderWake();
+if (navigator.permissions && navigator.permissions.query){
+  navigator.permissions.query({ name: 'geolocation' }).then(p => { if (p.state === 'granted') { startGPS(); renderGps(); } }).catch(() => {});
+}
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
